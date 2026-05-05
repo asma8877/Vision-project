@@ -1,9 +1,8 @@
-# Vision-project
-Computer vision semester project
+# Vision Semester Project
 
 Done by  Inas, Fatima, Asma
 
-Description: 
+## Description: 
 
 This project focuses on camouflaged object detection (COD) using deep learning techniques. It compares a baseline segmentation model (UNet) with a more advanced architecture (EMCAD with PVTv2-B2 encoder) on the COD10K dataset.
 
