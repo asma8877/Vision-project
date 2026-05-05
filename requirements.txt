@@ -1,0 +1,9 @@
+torch
+torchvision
+timm
+einops
+opencv-python-headless
+tqdm
+matplotlib
+pandas
+numpy
