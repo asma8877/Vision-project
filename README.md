@@ -1,4 +1,6 @@
-# Vision Semester Project
+# Camouflaged Object Detection in Complex Visual Environments Using Efficient Multi-scale Convolutional Attention Decoding (EMCAD)
+
+
 
 Done by  Inas, Fatima, Asma
 
