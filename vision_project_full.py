@@ -30,7 +30,9 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import pandas as pd
 
+# ---------------------------------------------------------------------------
 # Configuration
+# ---------------------------------------------------------------------------
 TRAIN_DIR  = '/home/vteam1/COD10K-v3/Train'
 TEST_DIR   = '/home/vteam1/COD10K-v3/Test'
 OUTPUT_DIR = '/home/vteam1/outputs'
@@ -43,6 +45,7 @@ LR         = 1e-4
 PATIENCE   = 7
 VAL_SPLIT  = 0.2   # 20% of train images used for validation
 SEED       = 42
+# ---------------------------------------------------------------------------
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 random.seed(SEED)
@@ -53,7 +56,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print("Using device:", device)
 
 
+# ---------------------------------------------------------------------------
 # Dataset
+# ---------------------------------------------------------------------------
 class COD10KDataset(Dataset):
     """Loads camouflaged images only (skips empty GT masks)."""
 
@@ -179,7 +184,9 @@ class COD10KDataset(Dataset):
         return img_t, mask_t, img_name
 
 
+# ---------------------------------------------------------------------------
 # Subset wrappers (train with augment, val without)
+# ---------------------------------------------------------------------------
 class AugmentedSubset(Dataset):
     def __init__(self, dataset, indices):
         self.dataset = dataset
@@ -203,7 +210,9 @@ class CleanSubset(Dataset):
         return self.dataset[self.indices[idx]]
 
 
+# ---------------------------------------------------------------------------
 # Data loading with 80/20 train/val split
+# ---------------------------------------------------------------------------
 print("\nLoading datasets...")
 
 full_train_ds = COD10KDataset(TRAIN_DIR, img_size=IMG_SIZE,
@@ -234,7 +243,9 @@ print(f"  Batches → Train: {len(train_loader)} | "
       f"Val: {len(val_loader)} | Test: {len(test_loader)}")
 
 
+# ---------------------------------------------------------------------------
 # Visualisation helpers
+# ---------------------------------------------------------------------------
 mean = np.array([0.485, 0.456, 0.406])
 std  = np.array([0.229, 0.224, 0.225])
 
@@ -268,7 +279,9 @@ plt.close()
 print("Training sample grid saved.")
 
 
+# ---------------------------------------------------------------------------
 # Shared loss and metric functions
+# ---------------------------------------------------------------------------
 def bce_dice_loss(pred, target, eps=1e-6):
     bce  = F.binary_cross_entropy_with_logits(pred, target)
     prob = torch.sigmoid(pred)
@@ -519,7 +532,9 @@ def train_model(model, loss_fn, get_logits_fn, model_name):
     return train_losses, val_losses, val_dices, best_dice
 
 
+# ===========================================================================
 # MODEL 1: UNet Baseline
+# ===========================================================================
 print("\n" + "=" * 60)
 print("  MODEL 1: UNet Baseline")
 print("=" * 60)
@@ -614,7 +629,9 @@ torch.save({
 print("UNet checkpoint saved.")
 
 
+# ===========================================================================
 # MODEL 2: EMCAD (PVTv2-B2 encoder)
+# ===========================================================================
 print("\n" + "=" * 60)
 print("  MODEL 2: EMCAD (PVTv2-B2)")
 print("=" * 60)
@@ -728,6 +745,10 @@ emcad_get_logits = lambda out: out[0]
 
 print("Building EMCAD model with PVTv2-B2 encoder...")
 emcad = EMCADModel(pretrained=True).to(device)
+zeroshot_weights = {
+    k: v.clone() for k, v in emcad.state_dict().items()
+
+}
 print(f"EMCAD parameters: "
       f"{sum(p.numel() for p in emcad.parameters())/1e6:.2f}M")
 
@@ -770,20 +791,22 @@ torch.save({
 print("EMCAD checkpoint saved.")
 
 
+# ===========================================================================
 # Comparison Table + Bar Chart
+# ===========================================================================
 print("\n" + "=" * 65)
 print("       Comparison Table on COD10K Test Set")
 print("=" * 65)
 
 published = {
-    'SINet [Fan 2020]':    {'dice':0.712,'iou':0.599,'f_measure':0.706,
+    'SINet [Fan 2020]':    {'dice':0,'iou':0,'f_measure':0.551,
                             's_measure':0.771,'e_measure':0.806,'mae':0.051},
-    'PFNet [Mei 2021]':    {'dice':0.793,'iou':0.695,'f_measure':0.791,
+    'PFNet [Mei 2021]':    {'dice':0,'iou':0,'f_measure':0.660,
                             's_measure':0.800,'e_measure':0.868,'mae':0.040},
-    'SegMaR [Jia 2022]':   {'dice':0.815,'iou':0.719,'f_measure':0.815,
-                            's_measure':0.815,'e_measure':0.875,'mae':0.035},
-    'ZoomNet [Pang 2022]': {'dice':0.820,'iou':0.729,'f_measure':0.820,
-                            's_measure':0.820,'e_measure':0.892,'mae':0.029},
+    'SegMaR [Jia 2022]':   {'dice':0,'iou':0,'f_measure':0.724,
+                            's_measure':0.833,'e_measure':0.895,'mae':0.033},
+    'ZoomNet [Pang 2022]': {'dice':0,'iou':0,'f_measure':0.729,
+                            's_measure':0.838,'e_measure':0.911,'mae':0.029},
 }
 
 keys = ['dice', 'iou', 'f_measure', 's_measure', 'e_measure', 'mae']
@@ -794,7 +817,10 @@ rows['EMCAD Fine-Tuned (Ours)'] = {k: emcad_test_results[k] for k in keys}
 
 df = pd.DataFrame(rows).T.round(4)
 df.columns = ['Dice', 'IoU', 'F-measure', 'S-measure', 'E-measure', 'MAE']
-print(df.to_string())
+# Replace 0 with '-' for display (so missing metrics show as dash)
+df_display = df.replace(0, '-')
+print(df_display.to_string())
+
 print("=" * 65)
 
 metrics_to_plot = ['Dice', 'IoU', 'F-measure', 'S-measure', 'E-measure']
@@ -823,7 +849,9 @@ plt.close()
 print("Comparison bar chart saved.")
 
 
+# ===========================================================================
 # Side-by-side comparison grid: UNet vs EMCAD Zero-Shot vs EMCAD Fine-Tuned
+# ===========================================================================
 print("Generating side-by-side comparison grid...")
 
 def get_predictions(model, loader, device, get_logits_fn, n=5):
@@ -850,10 +878,26 @@ fixed_loader = DataLoader(
 
 n_compare = 5
 unet_preds   = get_predictions(unet,  fixed_loader, device, unet_get_logits,  n_compare)
-zshot_preds  = get_predictions(emcad, fixed_loader, device, emcad_get_logits, n_compare)
+# Create true zero-shot model from saved weights
+emcad_zero = EMCADModel(pretrained=True).to(device)
+emcad_zero.load_state_dict(zeroshot_weights)
 
-# Reload best EMCAD weights (already loaded) — fine-tuned preds
-ftune_preds  = get_predictions(emcad, fixed_loader, device, emcad_get_logits, n_compare)
+zshot_preds = get_predictions(
+    emcad_zero,
+    fixed_loader,
+    device,
+    emcad_get_logits,
+    n_compare
+)
+
+# Already fine-tuned EMCAD
+ftune_preds = get_predictions(
+    emcad,
+    fixed_loader,
+    device,
+    emcad_get_logits,
+    n_compare
+)
 
 # columns: Input | GT | UNet | EMCAD ZS | EMCAD FT
 col_titles = ['Input', 'Ground Truth', 'UNet', 'EMCAD Zero-Shot', 'EMCAD Fine-Tuned']
